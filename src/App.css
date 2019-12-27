@@ -1,3 +1,7 @@
 .App {
   height: 100%;
 }
+
+#parallax-canvas {
+  background-color: black;
+}
