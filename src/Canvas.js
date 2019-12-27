@@ -1,35 +1,14 @@
 import React from 'react';
-
-/**
- * Move to util file
- */
-let euclideanDistance = (p1,p2) => {
-    let xdiff = Math.pow((p1.x-p2.x),2);
-    let ydiff = Math.pow((p1.y-p2.y),2);
-   return Math.sqrt( xdiff + ydiff);
-}
-
-/**
- * Move to util file
- * returns number between [0,1] depending on how close p1 is to p2
- */
-let getMultiplicationFactor = (cutOffDistance, p1, p2) => {
-  // Calculate euclidean distance between center of rect and mouse mooseCoords
-  let distance = euclideanDistance(p1, p2);
-
-  if (distance < cutOffDistance) {
-    // Linear increase as centerX approaches mouseCoords.x as long as max difference is < cutOffDistance
-    // y = -1/max (centerX - mooseCoords.x) + 1 where max = cutOffDistance
-    return ((-1 / cutOffDistance) * distance + 1);
-  } else {
-    return 0;
-  }
-}
+import {getMultiplicationFactor} from './util';
 
 /**
  * Class for rectanges drawn on screen
  */
 class Rectangle {
+
+  /**
+   *
+   */
   constructor(x, y, width, height) {
     this.x = x;
     this.y = y;
@@ -40,12 +19,49 @@ class Rectangle {
       y: this.y + this.height / 2,
     }
   }
+
+  /**
+   * Given previous & current mouse Pos, draw Rect on canvas
+   * Center moves linearly with mousePos by specific factors
+   * Width and height grow linearly as mouse approaches center of rectangle
+   */
+  draw(ctx, prevMouseCoords, mouseCoords) {
+    // Move new center in opposite direction of mouse movement
+    // Move by 1/6 * X difference and 1/8 Y difference in mouse position
+    if (prevMouseCoords.x !== 0 && prevMouseCoords.y !== 0) {
+      this.center.x = this.center.x - (mouseCoords.x - prevMouseCoords.x)/6;
+      this.center.y = this.center.y - (mouseCoords.y - prevMouseCoords.y)/8;
+    }
+
+    // Get distance-related multiplication factor
+    // The closer the mouse Coords are to the center, the closer the factor to 1
+    let mFactor = getMultiplicationFactor(300, this.center, mouseCoords)
+
+    // Draw rectangle (around it's center) with dimensions depending on how close
+    // the mouse is to said center using the mFactor
+    let dynamicWidth = this.width + this.width * mFactor;
+    let dynamicHeight = this.height + this.height * mFactor;
+    ctx.fillStyle = 'rgb(200, 0, 0)';
+    ctx.fillRect(this.center.x - dynamicWidth/2, this.center.y - dynamicHeight/2, dynamicWidth, dynamicHeight);
+
+    // Draw rectangle center (for testing)
+    ctx.fillStyle = 'rgb(40, 0, 0)';
+    ctx.fillRect(this.center.x-3, this.center.y-3, 6, 6);
+  }
 }
 
 /**
  *
  */
 export default class Canvas extends React.Component {
+
+  /**
+   * Holds mouse coords from previous animation cycle
+   */
+  prevMouseCoords = {
+    x: 0,
+    y: 0,
+  }
 
   /**
    * Retrieves ref to canvas DOM element via ref callback
@@ -90,25 +106,12 @@ export default class Canvas extends React.Component {
     // Clear canvas
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-    // Get distance-related multiplication factor
-    // The closer the mouse Coords are to the center, the closer the factor to 1
-    let mFactor = getMultiplicationFactor(300, this.rect.center, mouseCoords)
+    // Draw new rectangle
+    this.rect.draw(ctx, this.prevMouseCoords, mouseCoords);
 
-    // Draw rectangle (around it's center) with dimensions depending on how close
-    // the mouse is to said center using the mFactor
-    ctx.fillStyle = 'rgb(200, 0, 0)';
-    ctx.fillRect(this.rect.center.x - (this.rect.width + this.rect.width * mFactor)/2,
-                 this.rect.center.y - (this.rect.height + this.rect.height * mFactor)/2,
-                 this.rect.width + this.rect.width * mFactor,
-                 this.rect.height + this.rect.height * mFactor);
+    // Store new mouse coords for use in next onMouseMove event
+    this.prevMouseCoords = mouseCoords;
 
-    // Draw rectangle center (for testing)
-    ctx.fillStyle = 'rgb(40, 0, 0)';
-    ctx.fillRect(this.rect.center.x, this.rect.center.y, 2, 2);
-
-    // Draw mouse rectangle
-    ctx.fillStyle = 'rgb(0, 0, 0)';
-    ctx.fillRect(mouseCoords.x, mouseCoords.y, 10, 10);
   }
 
 
