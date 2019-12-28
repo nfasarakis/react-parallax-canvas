@@ -2,45 +2,53 @@ import React from 'react';
 import {euclideanDistance, getMultiplicationFactor} from './util';
 
 /**
- * 1) Positions of elements within canvas
- *    Expressed as percentage (i.e in [0, 1])
- * 2) Width and height
- * 2) Colors/Image URLs
- *
+ * Properties of images drawn on canvas
+ * Includes top, left, width, height and the image url
+ * Used for testing (should be passed as props)
  */
-let getRandColor = () => `rgb(${Math.round(250*Math.random())}, ${Math.round(250*Math.random())}, ${Math.round(250*Math.random())})`;
-const FILL_RECT_PROPS = [
-  {x: Math.random(), y: Math.random(), w: 200, h: 250, color: getRandColor()},
-  {x: Math.random(), y: Math.random(), w: 200, h: 250, color: getRandColor()},
-  {x: Math.random(), y: Math.random(), w: 200, h: 250, color: getRandColor()},
-  {x: Math.random(), y: Math.random(), w: 200, h: 250, color: getRandColor()},
-  {x: Math.random(), y: Math.random(), w: 200, h: 250, color: getRandColor()},
-  {x: Math.random(), y: Math.random(), w: 200, h: 250, color: getRandColor()},
-  {x: Math.random(), y: Math.random(), w: 200, h: 250, color: getRandColor()},
-  {x: Math.random(), y: Math.random(), w: 200, h: 250, color: getRandColor()},
-  {x: Math.random(), y: Math.random(), w: 200, h: 250, color: getRandColor()},
-  {x: Math.random(), y: Math.random(), w: 200, h: 250, color: getRandColor()},
+const CANVAS_IMAGE_PROPS = [
+  {left: 0.2, top: 0.2, w: 200, h: 250, url: '../Assets/Images/boat.jpg'},
+  {left: 0.5, top: 0.5, w: 200, h: 250, url: '../Assets/Images/evening.jpg'},
+  {left: 0.3, top: 0.8, w: 200, h: 250, url: '../Assets/Images/sunset.jpg'},
+  {left: 0.8, top: 0.3, w: 200, h: 250, url: '../Assets/Images/tree1.jpg'},
+  {left: 0.9, top: 0.8, w: 200, h: 250, url: '../Assets/Images/tree2.jpg'},
+  {left: 0.4, top: 0.4, w: 200, h: 250, url: '../Assets/Images/tree3.jpg'},
 ]
 
-
 /**
- * Class for rectanges drawn on screen
+ * Class for images drawn on screen
  */
-class Rectangle {
+class CanvasImage {
 
   /**
    *
    */
-  constructor(x, y, width, height, color) {
-    this.x = x;
-    this.y = y;
+  constructor(left, top, width, height, url) {
     this.width = width;
     this.height = height;
-    this.color = color;
+    this.url = url;
     this.center = {
-      x: this.x + this.width / 2,
-      y: this.y + this.height / 2,
+      x: left + width / 2,
+      y: top + height / 2,
     }
+  }
+
+  /**
+   *
+   */
+  drawInit(ctx) {
+    // Create new img element
+    this.img = new Image();
+    // Attach onload handler
+    this.img.addEventListener('load', () => {
+      ctx.drawImage(this.img, this.center.x - this.width / 2, this.center.y - this.height / 2, this.width, this.height);
+    }, false);
+    // Set source
+    this.img.src = this.url; // Set source path
+
+    // Draw rectangle center (for testing)
+    ctx.fillStyle = 'rgb(40, 0, 0)';
+    ctx.fillRect(this.center.x-3, this.center.y-3, 6, 6);
   }
 
   /**
@@ -49,6 +57,7 @@ class Rectangle {
    * Width and height grow linearly as mouse approaches center of rectangle
    */
   draw(ctx, prevMouseCoords, mouseCoords) {
+
     // Move new center in opposite direction of mouse movement
     // Move by 1/6 * X difference and 1/8 Y difference in mouse position
     if (prevMouseCoords.x !== 0 && prevMouseCoords.y !== 0) {
@@ -64,13 +73,23 @@ class Rectangle {
     // the mouse is to said center using the mFactor
     let dynamicWidth = this.width + this.width * mFactor;
     let dynamicHeight = this.height + this.height * mFactor;
-    ctx.fillStyle = this.color;
-    ctx.fillRect(this.center.x - dynamicWidth/2, this.center.y - dynamicHeight/2, dynamicWidth, dynamicHeight);
+
+    // Create new img element
+    ctx.drawImage(this.img, this.center.x - dynamicWidth/2, this.center.y - dynamicHeight/2, dynamicWidth, dynamicHeight);
+
 
     // Draw rectangle center (for testing)
     ctx.fillStyle = 'rgb(40, 0, 0)';
     ctx.fillRect(this.center.x-3, this.center.y-3, 6, 6);
   }
+
+  /**
+   *
+   */
+  onClick() {
+    alert(`clicked ${this.url}`);
+  }
+
 }
 
 /**
@@ -105,20 +124,14 @@ export default class Canvas extends React.Component {
     // Draw function
     let ctx = this.canvas.getContext('2d');
 
-    // Create & Draw Rectanges
-    FILL_RECT_PROPS.map((rect, idx) => {
-        this.canvasElements[idx] = new Rectangle(
-          rect.x * this.canvas.width - rect.w / 2,
-          rect.y * this.canvas.height - rect.h / 2,
-          rect.w, rect.h, rect.color);
+    // Create & Draw Canvas Images
+    CANVAS_IMAGE_PROPS.map((img, idx) => {
+        this.canvasElements[idx] = new CanvasImage(
+          img.left * this.canvas.width - img.w / 2,
+          img.top * this.canvas.height - img.h / 2,
+          img.w, img.h, img.url);
 
-        ctx.fillStyle = rect.color;
-        return ctx.fillRect(
-          this.canvasElements[idx].x,
-          this.canvasElements[idx].y,
-          this.canvasElements[idx].width,
-          this.canvasElements[idx].height,
-        )
+        return this.canvasElements[idx].drawInit(ctx);
     })
   }
 
@@ -126,10 +139,10 @@ export default class Canvas extends React.Component {
    *
    */
   getMouseCoords = evt => {
-    let rect = this.canvas.getBoundingClientRect();
+    let canvasBox = this.canvas.getBoundingClientRect();
     return {
-      x: evt.clientX - rect.left,
-      y: evt.clientY - rect.top
+      x: evt.clientX - canvasBox.left,
+      y: evt.clientY - canvasBox.top
     };
   }
 
@@ -161,11 +174,40 @@ export default class Canvas extends React.Component {
 
   }
 
+  /**
+   *
+   */
+  handleCanvasClick = (evt) => {
+    // Find what element was clicked on
+    let mouseCoords = this.getMouseCoords(evt);
+
+    // If mouse coords is withing images bounds, it's been clicked
+    // Loop over canvas elements
+    let clickedElements = this.canvasElements.filter(elem => {
+      // When calculating bounds, also factor in mFactor
+      let mFactor = getMultiplicationFactor(300, elem.center, mouseCoords);
+      let dynamicWidth = elem.width + elem.width * mFactor;
+      let dynamicHeight = elem.height + elem.height * mFactor;
+
+      return mouseCoords.x > elem.center.x - dynamicWidth / 2 &&
+      mouseCoords.x < elem.center.x + dynamicWidth / 2 &&
+      mouseCoords.y > elem.center.y - dynamicHeight / 2 &&
+      mouseCoords.y < elem.center.y + dynamicHeight /2
+    });
+
+    // For overlapping elements, execute click handler for the one whose
+    // center is clossest to the mouse coords
+    // clickedElements already sorted since this.canvasElements are sorted
+    clickedElements.length > 0 && clickedElements[clickedElements.length - 1].onClick();
+
+  }
+
 
   render() {
     return (
       <canvas id = 'parallax-canvas'
               onMouseMove = {this.handleMouseMove}
+              onClick = {this.handleCanvasClick}
               ref = {this.setCanvasRef}
               width = {window.innerWidth}
               height = {window.innerHeight}>
