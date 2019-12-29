@@ -265,10 +265,10 @@ export default class Canvas extends React.Component {
       euclideanDistance(elem2.center, translatedMouseCoords) - euclideanDistance(elem1.center, translatedMouseCoords)
     )
 
-    // Draw new images by mapping over the sorted canvas elements
+    // Draw new images by iterating over the sorted canvas elements
     // Elements closest to the translated mouse coords get painted over elements
     // that are furter away.
-    this.canvasElements.map(elem =>
+    this.canvasElements.forEach(elem =>
       elem.draw(ctx, translatedMouseCoords)
     );
 
