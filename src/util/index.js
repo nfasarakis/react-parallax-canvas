@@ -1,2 +1,2 @@
-import {euclideanDistance, getMultiplicationFactor} from './util.js';
-export {euclideanDistance, getMultiplicationFactor};
+import {euclideanDistance} from './util.js';
+export {euclideanDistance};
