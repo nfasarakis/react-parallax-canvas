@@ -134,10 +134,8 @@ class CanvasImage {
     let mFactor = 0;
     if (this.currentValue < cutOffDistance) {
       // Linear f(distance) = (-1 / cutOffDistance) * distance + 1
-      //
-      //    As distance aproaches cutOffDistance => f(distance) approaches 0
-      //    As distnce aproaches 0               => f(distance) approaches 1
-      //
+      //    - As distance aproaches cutOffDistance => f(distance) approaches 0
+      //    - As distnce aproaches 0               => f(distance) approaches 1
       mFactor = (-1 / cutOffDistance) * this.currentValue + 1;
     }
 
@@ -167,21 +165,26 @@ class CanvasImage {
 export default class Canvas extends React.Component {
 
 
-  /**
-   * Array of elements drawn on canvas
-   */
-   canvasElements = [];
+  // Array of elements drawn on canvas
+  canvasElements = [];
 
-  /**
-   * Most recently recorder mouseCoords
-   */
+  // Most recently recorder mouseCoords
    mouseCoords = {
      x: 2000,
      y: 2000.
    }
 
+   // Keep's tack of canvas origin
+   canvasOrigin = {
+     x: 0,
+     y: 0,
+   }
+
   /**
-   * Retrieves ref to canvas DOM element via ref callback
+   * Retrieves ref to canvas DOM element via ref callback attached in render()
+   * This ref is guaranteed to be up-to-date before lifecycle methods fire.
+   *
+   * @param {object} element - HTML DOM element the ref callback is attached to
    */
   setCanvasRef = (element) => {
     this.canvas = element
@@ -191,7 +194,6 @@ export default class Canvas extends React.Component {
    * Sets-up images in canvas (initial draw) and starts animation loop
    */
   componentDidMount() {
-    // Draw function
     let ctx = this.canvas.getContext('2d', { alpha: false });
 
     // Create & Draw Canvas Images
