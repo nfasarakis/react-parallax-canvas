@@ -114,11 +114,11 @@ class CanvasImage {
     let destinationValue = euclideanDistance(this.center, mouseCoords);
 
     // If the current animation value is equal to the destinationValue, do nothing
-    if (Math.round(Math.abs(this.currentValue - destinationValue)) > this.speed) {
+    if (Math.round(Math.abs(this.currentValue - destinationValue)) - this.speed > 0.05) {
       // Compute rate of change based on the destinationValue and currentValue
       // Animation slows down as currentValue approaches destinationValue
       // Note the accelaration factor of 0.1
-      this.speed = Math.abs(destinationValue - this.currentValue) * 0.1;
+      this.speed = Math.abs(destinationValue - this.currentValue) * 0.05;
       // Is the rate of change positive or negative?
       let sign = (this.currentValue < destinationValue) ? 1 : -1;
       // Move currentValue towards destinationValue
@@ -143,10 +143,11 @@ class CanvasImage {
     let dynamicWidth = Math.floor(this.width + this.width * mFactor);
     let dynamicHeight = Math.floor(this.height + this.height * mFactor);
 
+
     // Draw a new image on the canvas w/ the new dimensions
     ctx.drawImage(this.img,
-      Math.floor(this.center.x - dynamicWidth/2),
-      Math.floor(this.center.y - dynamicHeight/2),
+      (this.center.x - dynamicWidth/2),
+      (this.center.y - dynamicHeight/2),
       dynamicWidth, dynamicHeight);
   }
 
@@ -171,13 +172,22 @@ export default class Canvas extends React.Component {
   // Most recently recorder mouseCoords
    mouseCoords = {
      x: 2000,
-     y: 2000.
+     y: 2000,
+     totalMovementX: 0,
+     totalMovementY: 0,
+   }
+   prevMouseCoords = {
+     x: undefined,
+     y: undefined,
    }
 
-   // Keep's tack of canvas origin
-   canvasOrigin = {
-     x: 0,
-     y: 0,
+   // parallax
+   parallax = {
+     currentOffsetX: 0,
+     speedOffsetX: 0,
+     currentOffsetY: 0,
+     speedOffsetY: 0,
+     coefficient: 1/4,
    }
 
   /**
@@ -189,7 +199,7 @@ export default class Canvas extends React.Component {
   setCanvasRef = (element) => {
     this.canvas = element
   }
-
+//
   /**
    * Sets-up images in canvas (initial draw) and starts animation loop
    */
@@ -211,6 +221,13 @@ export default class Canvas extends React.Component {
 
   }
 
+  //
+  // DONT FORGET TO KILL ANIMATION!!!!
+  //
+  componentWillUnmount() {
+    alert('You forgot to kill the animation');
+  }
+
   /**
    * Clears the canvas and re-draws images, animating their dimensions
    * based on the distance of their centers to the mouse position
@@ -219,19 +236,78 @@ export default class Canvas extends React.Component {
     let ctx = this.canvas.getContext('2d');
 
     // Clear canvas
-    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    ctx.save();
+    ctx.globalCompositeOperation = 'copy';
+    ctx.strokeStyle = 'transparent';
+    ctx.beginPath();
+    ctx.lineTo(0, 0);
+    ctx.stroke();
+    ctx.restore();
+
+    // ANIMATE CANVAS TRANSORM AND MOUSE COORDS?
+    // Note:
+    // I can't use movementX
+    // Consider the following example
+    // User drags the mouse rapidly to the right and evt.movementX = 100
+    // The animation begins animating centers to +100
+    // but instantly, user moves the mouse by 1px
+    // Now the non-deterministic easing reacts to this change an animates to 1 instead
+    // However, the mouse has already traveled 101px
+    // One possible solution is to track the total mouse movement.
+    // Lets try that first...
+
+    let destinationValueX = this.mouseCoords.totalMovementX;
+    let destinationValueY = this.mouseCoords.totalMovementY;
+    //console.log(this.mouseCoords.totalMovementX)
+
+    if (Math.abs(destinationValueX - this.parallax.currentOffsetX) - this.parallax.speedOffsetX > 0.3) {
+      // Havent reached destination
+      this.parallax.speedOffsetX= Math.abs(destinationValueX - this.parallax.currentOffsetX) * 0.3;
+      // Is the rate of change positive or negative?
+      let sign = (this.parallax.currentOffsetX < destinationValueX) ? 1 : -1;
+      this.parallax.speedOffsetX *= sign;
+      // Move currentValue towards destinationValue
+      this.parallax.currentOffsetX += this.parallax.speedOffsetX;
+    }
+
+    if (Math.abs(destinationValueY - this.parallax.currentOffsetY) - this.parallax.speedOffsetY > 0.1) {
+      // Havent reached destination
+      this.parallax.speedOffsetY= Math.abs(destinationValueY - this.parallax.currentOffsetY) * 0.1;
+      // Is the rate of change positive or negative?
+      let sign = (this.parallax.currentOffsetY < destinationValueY) ? 1 : -1;
+      this.parallax.speedOffsetY *= sign;
+      // Move currentValue towards destinationValue
+      this.parallax.currentOffsetY += this.parallax.speedOffsetY;
+    }
+
+    // Translate canvas
+    // First reset to get fresh transform
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    // NOTICE the minus so we move in opposite direction of mouse
+    ctx.translate(
+      Math.floor(-this.parallax.currentOffsetX * this.parallax.coefficient),
+      Math.floor(-this.parallax.currentOffsetY * this.parallax.coefficient),
+    );
+    // Apply changes to mouseCoords so their on the right basis
+    // Do not directly modify mouseCoords instance
+    let translatedMouseCoords = {
+      x: this.mouseCoords.x + Math.floor(this.parallax.currentOffsetX * this.parallax.coefficient),
+      y: this.mouseCoords.y + Math.floor(this.parallax.currentOffsetY * this.parallax.coefficient),
+    };
+
+
 
     // Order canvas elements bassed on the distance of their centers from mouseCoords
     // Elements w/ centers closest to mouse Coords get placed at end of array
     this.canvasElements.sort((elem1, elem2) =>
-      euclideanDistance(elem2.center, this.mouseCoords) - euclideanDistance(elem1.center, this.mouseCoords)
+      euclideanDistance(elem2.center, translatedMouseCoords) - euclideanDistance(elem1.center, translatedMouseCoords)
     )
 
     // Draw new images by mapping over canvas elements
     // Due to sorting, elements closest to mouse coords get painted over elements
     // that are furter away.
     this.canvasElements.map(elem =>
-      elem.draw(ctx, this.mouseCoords)
+      elem.draw(ctx, translatedMouseCoords)
     );
 
     // Loop animation
@@ -245,10 +321,30 @@ export default class Canvas extends React.Component {
    */
   handleMouseMove = evt => {
     let canvasBox = this.canvas.getBoundingClientRect();
+
+    // NOT USING MOVEMENT X SINSE IT BUGS OUT ON SUDDEN JERKING MOVEMENTS
+    // TEST THIS WITH CONSOLE LOGS
+    if (this.prevMouseCoords.x === undefined & this.prevMouseCoords.y === undefined) {
+      // First time mouse moved
+      this.prevMouseCoords.x = evt.clientX - canvasBox.left;
+      this.prevMouseCoords.y = evt.clientY - canvasBox.top;
+    }
+
     this.mouseCoords = {
       x: evt.clientX - canvasBox.left,
-      y: evt.clientY - canvasBox.top
+      y: evt.clientY - canvasBox.top,
+      totalMovementX: this.mouseCoords.totalMovementX + evt.clientX - canvasBox.left - this.prevMouseCoords.x,
+      totalMovementY: this.mouseCoords.totalMovementY + evt.clientY - canvasBox.top - this.prevMouseCoords.y,
     };
+    this.prevMouseCoords = {
+      x: this.mouseCoords.x,
+      y: this.mouseCoords.y,
+    }
+    //
+    //console.log(this.mouseCoords)
+    //console.log(this.prevMouseCoords)
+    // console.log('\n');
+
   }
 
   /**
