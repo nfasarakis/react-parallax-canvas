@@ -143,8 +143,8 @@ export default class Canvas extends React.Component {
    *                      in the X and Y axises
    */
    mouseCoords = {
-     x: 2000,
-     y: 2000,
+     x: 2 * window.innerWidth,
+     y: 2 * window.innerHeight,
      totalMovementX: 0,
      totalMovementY: 0,
    }
