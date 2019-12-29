@@ -78,8 +78,8 @@ class CanvasImage {
    *
    * This function is called within an animation loop. At each time step,
    * the image's dimensions slowly animate towards their final value using an easing function.
-   * Try moving the mouse. You'll notice the animation lingers even after the mouse
-   * stops moving, offering a smoother experience.
+   * This easing is not-deterministic as the destinationValue depends on the mouseCoords
+   * that may change suddenly
    *
    * @param {object} ctx - Canvas rendering context object
    * @param {object} mouseCoords - Object containing x and y coords of the mouse
@@ -97,7 +97,7 @@ class CanvasImage {
     let acc_coef = 0.05;
     // Function used to compare how close the currect value is to the destination value
     let compareFunction = (a,b) => Math.abs(a - b);
-    // Apply easing
+    // Apply easing (ease out)
     [this.currentValue, this.speed] = getEasing(dest, curr, speed, acc_coef, compareFunction);
 
     // Linearly interpolate currentValue from [cutOffDistance, 0] to [0,1]
@@ -213,8 +213,9 @@ export default class Canvas extends React.Component {
    * their centers to the mouse position - see {@link CanvasImage#draw} method
    *
    * At each time step, the canva's origin animates towards its final value using
-   * an easing function. Try moving the mouse and you'll notice the animation
-   * lingers even after the mouse stops moving, offering a smoother experience.
+   * an easing function.
+   * This easing is not-deterministic as the destinationValue depends on the mouse
+   * movement that may change suddenly
    */
   animate() {
     let ctx = this.canvas.getContext('2d');
