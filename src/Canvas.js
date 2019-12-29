@@ -112,7 +112,8 @@ class CanvasImage {
         scale: 1 + mFactor,
         offsetX: - mouseCoords.totalMovementX * 0.25,
         offsetY: - mouseCoords.totalMovementY * 0.25,
-        duration: 0.5
+        duration: 0.8,
+        ease: 'power1.out',
       }
     );
 
