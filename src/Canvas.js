@@ -1,6 +1,6 @@
 import React from 'react';
 import gsap from 'gsap';
-import {euclideanDistance, applyNonDeterministicEaseOut} from './util';
+import {euclideanDistance} from './util';
 
 /**
  * Properties of images drawn on canvas
