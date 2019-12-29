@@ -161,6 +161,7 @@ export default class Canvas extends React.Component {
      totalMovementX: 0,
      totalMovementY: 0,
    }
+   mouseMoved = false;
 
    /**
     * @instance {boolean} - Boolean detoting if the initial animation that first
@@ -203,17 +204,27 @@ export default class Canvas extends React.Component {
      // Clear canvas
      this.clearCanvas(ctx);
 
-     // Order canvas elements bassed on the distance of their centers from the translated mouseCoords
-     // Elements w/ centers closest to the mouse position get placed at end of array
-     // and are therefore painted last
-     this.canvasElements.sort((elem1, elem2) =>
-        euclideanDistance(elem2.center, this.mouseCoords) - euclideanDistance(elem1.center, this.mouseCoords)
-     )
 
-     // Draw new images by iterating over the sorted canvas elements
-     this.canvasElements.forEach(elem =>
-       elem.draw(ctx)
-     );
+     if (this.mouseMoved) {
+       // Order canvas elements bassed on the distance of their centers from the mouseCoords
+       // Elements w/ centers closest to the mouse position get placed at end of array
+       // and are therefore painted last
+       this.canvasElements.sort((elem1, elem2) =>
+         euclideanDistance(elem2.center, this.mouseCoords) - euclideanDistance(elem1.center, this.mouseCoords)
+       )
+
+       // Start individual animations
+       this.canvasElements.forEach(elem =>
+         elem.animateScaleOnMouseMove(this.mouseCoords)
+       );
+
+       this.mouseMoved = false;
+    }
+
+    // Draw all elements
+    this.canvasElements.forEach(elem => elem.draw(ctx));
+
+
    }
 
   /**
@@ -245,11 +256,7 @@ export default class Canvas extends React.Component {
       prevx: mx,
       prevy: my,
     };
-
-    // Animate all images to new positions
-    this.canvasElements.forEach(elem =>
-      elem.animateScaleOnMouseMove(this.mouseCoords)
-    );
+    this.mouseMoved = true;
   }
 
   /**
