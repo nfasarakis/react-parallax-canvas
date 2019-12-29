@@ -283,8 +283,8 @@ export default class Canvas extends React.Component {
     * Checks if image has actually loaded before starting the animation specified
     * in {@link CanvasImage#drawFadeIn}
     *
-    * At each step the each LOADED image's opacity animates from 0 to 1 w/ easeOut easing
-    * function
+    * At each step the each LOADED image's opacity animates from 0 to 1 w/ an
+    * easeOut easing function
     *
     * @param {number} timestamp - current point in time (in ms) when requestAnimationFrame()
     *                             starts to execute callback functions.
@@ -299,14 +299,12 @@ export default class Canvas extends React.Component {
        elem.hasLoaded && elem.drawFadeIn(ctx, duration, timestamp)
      });
 
-     // initalAnimation has finished only if all images have loaded and all
-     // their opacities are 1
+     // initalAnimation has finished iff all images have loaded w/ opacities 1
      let numVisibleLoadedImages = 0;
      this.canvasElements.forEach((elem, idx) => {
        numVisibleLoadedImages += (elem.hasLoaded === true && elem.opacity === 1) ? 1 : 0;
      });
-     let haveAllImagesBeenShown = (numVisibleLoadedImages === CANVAS_IMAGE_PROPS.length)
-     this.hasInitAnimationFinished = haveAllImagesBeenShown;
+     this.hasInitAnimationFinished = (numVisibleLoadedImages === CANVAS_IMAGE_PROPS.length);
    }
 
   /**
