@@ -13,9 +13,12 @@ let euclideanDistance = (p1,p2) => {
 }
 
 /**
+ * Non deterministic easing
+ * https://stackoverflow.com/questions/37966505/how-to-rotate-a-canvas-object-following-mouse-move-event-with-easing
  *
+ * Unlike deterministic easing, where ...
  */
-let getEasing = (destinationValue, currentValue, speed, accelaration_coefficient, compareFunction) => {
+let applyNonDeterministicEaseOut = (destinationValue, currentValue, speed, accelaration_coefficient, compareFunction) => {
 
   // If the current animation value is equal to the destinationValue, do nothing
   if (compareFunction(currentValue, destinationValue) - speed > accelaration_coefficient) {
@@ -31,4 +34,4 @@ let getEasing = (destinationValue, currentValue, speed, accelaration_coefficient
 
 }
 
-export {euclideanDistance, getEasing}
+export {euclideanDistance, applyNonDeterministicEaseOut}

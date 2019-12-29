@@ -1,2 +1,8 @@
-import {euclideanDistance, getEasing} from './util.js';
-export {euclideanDistance, getEasing};
+import {
+  euclideanDistance,
+  applyNonDeterministicEaseOut
+} from './util.js';
+export {
+  euclideanDistance,
+  applyNonDeterministicEaseOut
+};

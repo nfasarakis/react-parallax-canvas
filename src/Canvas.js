@@ -1,5 +1,5 @@
 import React from 'react';
-import {euclideanDistance, getEasing} from './util';
+import {euclideanDistance, applyNonDeterministicEaseOut} from './util';
 
 /**
  * Properties of images drawn on canvas
@@ -109,7 +109,7 @@ class CanvasImage {
     // Function used to compare how close the currect value is to the destination value
     let compareFunction = (a,b) => Math.abs(a - b);
     // Apply easing (ease out)
-    [this.currentValue, this.speed] = getEasing(dest, curr, speed, acc_coef, compareFunction);
+    [this.currentValue, this.speed] = applyNonDeterministicEaseOut(dest, curr, speed, acc_coef, compareFunction);
 
     // Linearly interpolate currentValue from [cutOffDistance, 0] to [0,1]
     // where cutOffDistance = 600px (for performance reasons)
@@ -307,9 +307,9 @@ export default class Canvas extends React.Component {
 
     // Apply easing and store results for next loop
     [this.origin.currentLeft, this.origin.speedLeft] =
-      getEasing(destLeft, currLeft, speedLeft, acc_coef, compareFunction);
+      applyNonDeterministicEaseOut(destLeft, currLeft, speedLeft, acc_coef, compareFunction);
     [this.origin.currentTop, this.origin.speedTop] =
-      getEasing(destTop, currTop, speedTop, acc_coef, compareFunction);
+      applyNonDeterministicEaseOut(destTop, currTop, speedTop, acc_coef, compareFunction);
 
 
     // Translate canvas to it's new position
