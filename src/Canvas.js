@@ -43,13 +43,16 @@ class CanvasImage {
   constructor(left, top, width, height, url) {
     this.width = width;
     this.height = height;
-    this.scale = 1;
-    this.globalAlpha = 0;
     this.url = url;
     this.center = {
       x: left + width / 2,
       y: top + height / 2,
     }
+    /*Scale of the image drawn on the canvas*/
+    this.scale = 1;
+    /*Opacity of the image drawn on the canvas*/
+    this.globalAlpha = 0;
+    /*Offset from the image's center used for parallax effect */
     this.offsetX = 0;
     this.offsetY = 0;
     /** Boolean denoting whether on not image has finished loading */
@@ -78,7 +81,7 @@ class CanvasImage {
    */
   draw(ctx) {
 
-    // Draw a new image on the canvas w/ set opacity
+    // Draw a new image on the canvas w/ set opacity & offset
     ctx.globalAlpha = this.globalAlpha;
     ctx.drawImage(this.img,
         this.center.x + this.offsetX - this.scale * this.width / 2,
@@ -90,7 +93,15 @@ class CanvasImage {
   }
 
   /**
+   * Animates/tweens the images scale and position on the canvas
+   * Both scale and position depend on the current mouse position
+   *  scale: depends linearly on the position of the image's center
+   *         from the mouse coordinates
+   *  position: (via offset) depends linearly on the total mouse movement
    *
+   * @param {mouseCoords} mouseCoords - Object containing positional info for
+   *                                    the mouse, including coordinates relative
+   *                                    to the canvas origin & total movement
    */
   animateScaleOnMouseMove(mouseCoords) {
     let imgCenter = {
@@ -120,14 +131,14 @@ class CanvasImage {
   }
 
   /**
-   *
+   * Animates/tweens the image's opacity to provide a fadein effect
    */
    fadeIn() {
      gsap.to(this, {globalAlpha: 1, duration: 0.5, ease: 'power1.in'});
    }
 
   /**
-   * Fires when region occupied by the image in the canvas is clicked
+   * Fires when the region occupied by the image in the canvas is clicked
    */
   onClick() {
     alert(`clicked ${this.url}`);
@@ -149,9 +160,9 @@ export default class Canvas extends React.Component {
 
   /**
    * @typedef {object} mouseCoords
-   * @instance {object} - Contains the most recent mouse position as well as
-   *                      the total relative distance the mouse has traveled
-   *                      in the X and Y axises
+   * @instance {object} - Contains the most recent mouse position relative to the
+   *                      origin of the canvas, as well as the total relative
+   *                      distance the mouse has traveled in the X and Y axises
    */
    mouseCoords = {
      x: 2 * window.innerWidth,
@@ -198,7 +209,7 @@ export default class Canvas extends React.Component {
      // Clear canvas
      this.clearCanvas(ctx);
 
-
+     // If the mouse is moving
      if (this.mouseMoved) {
        // Order canvas elements bassed on the distance of their centers from the mouseCoords
        // Elements w/ centers closest to the mouse position get placed at end of array
@@ -222,7 +233,7 @@ export default class Canvas extends React.Component {
    }
 
   /**
-   * MouseMove Event Handler - Retrieve mouse coordinates and movement
+   * Event Handler - Retrieve mouse coordinates and movement relative to canvas
    * Note: For the mouse movement, evt.movementX & evt.movementY are not used sinse
    * they seem to behave randomly for sudden mouse movements.
    *
@@ -250,6 +261,8 @@ export default class Canvas extends React.Component {
       prevx: mx,
       prevy: my,
     };
+
+    // Set mouse as moving
     this.mouseMoved = true;
   }
 
@@ -264,7 +277,6 @@ export default class Canvas extends React.Component {
    * @param {object} evt - Event object
    */
   handleCanvasClick = (evt) => {
-
     let clickedElements = this.canvasElements.filter(elem => {
 
       // Is the mouse within the image's region?
