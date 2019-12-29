@@ -54,7 +54,6 @@ class CanvasImage {
     this.offsetY = 0;
     /** Boolean denoting whether on not image has finished loading */
     this.hasLoaded = false;
-
   }
 
   /**
@@ -184,13 +183,7 @@ export default class Canvas extends React.Component {
    * @param {object} ctx - Canvas rendering context object
    */
    clearCanvas = (ctx) => {
-     ctx.save();
-     ctx.globalCompositeOperation = 'copy';
-     ctx.strokeStyle = 'transparent';
-     ctx.beginPath();
-     ctx.lineTo(0, 0);
-     ctx.stroke();
-     ctx.restore();
+     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
    }
 
    /**
