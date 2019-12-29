@@ -12,4 +12,23 @@ let euclideanDistance = (p1,p2) => {
    return Math.sqrt( xdiff + ydiff);
 }
 
-export {euclideanDistance}
+/**
+ *
+ */
+let getEasing = (destinationValue, currentValue, speed, accelaration_coefficient, compareFunction) => {
+
+  // If the current animation value is equal to the destinationValue, do nothing
+  if (compareFunction(currentValue, destinationValue) - speed > accelaration_coefficient) {
+    // Compute rate of change based on the destinationValue and currentValue
+    // Animation slows down as currentValue approaches destinationValue
+    speed = compareFunction(currentValue, destinationValue) * accelaration_coefficient;
+    // Is the rate of change positive or negative?
+    let sign = (currentValue < destinationValue) ? 1 : -1;
+    // Move currentValue towards destinationValue
+    currentValue += sign * speed;
+  }
+  return [currentValue, speed];
+
+}
+
+export {euclideanDistance, getEasing}

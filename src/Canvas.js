@@ -1,5 +1,5 @@
 import React from 'react';
-import {euclideanDistance} from './util';
+import {euclideanDistance, getEasing} from './util';
 
 /**
  * Properties of images drawn on canvas
@@ -75,34 +75,10 @@ class CanvasImage {
    * The dimensions of the drawn image depend linerly on the distance between
    * the image's center and the currect mouse position.
    *
-   * This function is called within an animation loop.
-   * Each time the draw() method is called, the image's dimensions
-   * animate to the distance-dependant new value using an easing function.
-   *
-   * This implementation uses "Non-deterministic easing". See this excelent SO post:
-   * https://stackoverflow.com/questions/37966505/how-to-rotate-a-canvas-object-following-mouse-move-event-with-easing
-   *
-   * What this means is that the destination value of the animation is not always known,
-   * as it may change due to new user input, therefore deterministic easing cannot be applied
-   * In our case users moving the mouse changes destination value (image dimensions)
-   * since it depends on the distance between the image center and the mouse coords.
-   * As such, the only thing we can really control is the rate of change.
-   *
-   * Therefore, this method works as follows
-   *    1) First it determines the amount of change per time step, called speed.
-   *       This value depends on the destinationValue, i.e the distance between the
-   *       image's center and the current mouse position.
-   *       For simplicity, assume the mouse position (& therefore the destinationValue)
-   *       is fixed for now.
-   *    2) It then multiplies the speed by an accelaration factor, determines
-   *       if the rate of change is positive or negative and adds the speed to the
-   *       currentValue tracked by the animation
-   *    3) As the currentValue approaches the destinationValue, the image's dimensions animate.
-   *       More specifically, the image's dimensions grow to double as the currentValue aproaches
-   *       the destinationValue using a linear transformation if the currentValue.
-   *    4) If at any point, the destinationValue changes, i.e due to the user moving the
-   *       mouse, the speed adjusts dynamically and the proccess loops back to 1)
-   *
+   * This function is called within an animation loop. At each time step,
+   * the image's dimensions slowly animate towards their final value using an easing function.
+   * Try moving the mouse. You'll notice the animation lingers even after the mouse
+   * stops moving, offering a smoother experience.
    *
    * @param {object} ctx - Canvas rendering context, providing the draw functions
    * @param {object} mouseCoords - Current position of the mouse on the 2D canvas
@@ -111,31 +87,25 @@ class CanvasImage {
   draw(ctx, mouseCoords) {
 
     // Value we want to reach as we animate
-    let destinationValue = euclideanDistance(this.center, mouseCoords);
-
-    // If the current animation value is equal to the destinationValue, do nothing
-    if (Math.round(Math.abs(this.currentValue - destinationValue)) - this.speed > 0.05) {
-      // Compute rate of change based on the destinationValue and currentValue
-      // Animation slows down as currentValue approaches destinationValue
-      // Note the accelaration factor of 0.1
-      this.speed = Math.abs(destinationValue - this.currentValue) * 0.05;
-      // Is the rate of change positive or negative?
-      let sign = (this.currentValue < destinationValue) ? 1 : -1;
-      // Move currentValue towards destinationValue
-      this.currentValue = this.currentValue + sign * this.speed;
-    }
+    let dest = euclideanDistance(this.center, mouseCoords);
+    // Value at current time step
+    let curr = this.currentValue;
+    // Current rate of change
+    let speed = this.speed;
+    // Accelaration coefficient
+    let acc_coef = 0.05;
+    // Function used to compare how close the currect value is to the destination value
+    let compareFunction = (a,b) => Math.abs(a - b);
+    // Apply easing
+    [this.currentValue, this.speed] = getEasing(dest, curr, speed, acc_coef, compareFunction);
 
     // Transform currentValue (expressing distance) into a number in [0,1]
-    // If it's greater than cutOffDistance, return zero
-    // i.e dimensions do not animate if currentValue is more than 600px away than
-    // images center. The choise of 600px is arbitrary
-    // NOTE: Maybe ill make this function exponential and remove cutOffDistance
     let cutOffDistance = 600;
     let mFactor = 0;
     if (this.currentValue < cutOffDistance) {
       // Linear f(distance) = (-1 / cutOffDistance) * distance + 1
       //    - As distance aproaches cutOffDistance => f(distance) approaches 0
-      //    - As distnce aproaches 0               => f(distance) approaches 1
+      //    - As distance aproaches 0               => f(distance) approaches 1
       mFactor = (-1 / cutOffDistance) * this.currentValue + 1;
     }
 
@@ -169,19 +139,22 @@ export default class Canvas extends React.Component {
   // Array of elements drawn on canvas
   canvasElements = [];
 
-  // Most recently recorder mouseCoords
+  // Most recently recorded mouse coordinates
    mouseCoords = {
      x: 2000,
      y: 2000,
+     // Total mouse movement
      totalMovementX: 0,
      totalMovementY: 0,
    }
+   // Prev value of mouse coordinates
    prevMouseCoords = {
      x: undefined,
      y: undefined,
    }
 
-   // parallax
+   // Object containing properties used for paralax animation
+   // Rename to left and top
    parallax = {
      currentOffsetX: 0,
      speedOffsetX: 0,
@@ -199,7 +172,7 @@ export default class Canvas extends React.Component {
   setCanvasRef = (element) => {
     this.canvas = element
   }
-//
+
   /**
    * Sets-up images in canvas (initial draw) and starts animation loop
    */
@@ -229,8 +202,15 @@ export default class Canvas extends React.Component {
   }
 
   /**
-   * Clears the canvas and re-draws images, animating their dimensions
-   * based on the distance of their centers to the mouse position
+   * Clears the canvas and applies a paralax effect by animating the canvas's origin,
+   * based on the current mouse coordinates.
+   * It then re-draws images, animating their dimensions based on the distance of
+   * their centers to the mouse position - see draw() method
+   *
+   * This function is called within an animation loop. At each time step,
+   * the canva's origin animates towards its final value using an easing function.
+   * Try moving the mouse. You'll notice the animation lingers even after the mouse
+   * stops moving, offering a smoother experience.
    */
   animate() {
     let ctx = this.canvas.getContext('2d');
@@ -244,68 +224,51 @@ export default class Canvas extends React.Component {
     ctx.stroke();
     ctx.restore();
 
-    // ANIMATE CANVAS TRANSORM AND MOUSE COORDS?
-    // Note:
-    // I can't use movementX
-    // Consider the following example
-    // User drags the mouse rapidly to the right and evt.movementX = 100
-    // The animation begins animating centers to +100
-    // but instantly, user moves the mouse by 1px
-    // Now the non-deterministic easing reacts to this change an animates to 1 instead
-    // However, the mouse has already traveled 101px
-    // One possible solution is to track the total mouse movement.
-    // Lets try that first...
+    // Destination values for canva's origin in the x and y plane resp.
+    let destLeft = this.mouseCoords.totalMovementX;
+    let destTop = this.mouseCoords.totalMovementY;
+    // Values at current time step
+    let currLeft = this.parallax.currentOffsetX;
+    let currTop = this.parallax.currentOffsetY;
+    // Rate of change at current time step
+    let speedLeft = this.parallax.speedOffsetX;
+    let speedTop = this.parallax.speedOffsetY;
+    // Accelaration coefficient
+    let acc_coef = 0.05;
+    // Function used to compare how close the currect value is to the destination value
+    let compareFunction = (a,b) => Math.abs(a - b);
 
-    let destinationValueX = this.mouseCoords.totalMovementX;
-    let destinationValueY = this.mouseCoords.totalMovementY;
-    //console.log(this.mouseCoords.totalMovementX)
+    // Apply easing and store results for next loop
+    [this.parallax.currentOffsetX, this.parallax.speedOffsetX] =
+      getEasing(destLeft, currLeft, speedLeft, acc_coef, compareFunction);
+    [this.parallax.currentOffsetY, this.parallax.speedOffsetY] =
+      getEasing(destTop, currTop, speedTop, acc_coef, compareFunction);
 
-    if (Math.abs(destinationValueX - this.parallax.currentOffsetX) - this.parallax.speedOffsetX > 0.3) {
-      // Havent reached destination
-      this.parallax.speedOffsetX= Math.abs(destinationValueX - this.parallax.currentOffsetX) * 0.3;
-      // Is the rate of change positive or negative?
-      let sign = (this.parallax.currentOffsetX < destinationValueX) ? 1 : -1;
-      this.parallax.speedOffsetX *= sign;
-      // Move currentValue towards destinationValue
-      this.parallax.currentOffsetX += this.parallax.speedOffsetX;
-    }
 
-    if (Math.abs(destinationValueY - this.parallax.currentOffsetY) - this.parallax.speedOffsetY > 0.1) {
-      // Havent reached destination
-      this.parallax.speedOffsetY= Math.abs(destinationValueY - this.parallax.currentOffsetY) * 0.1;
-      // Is the rate of change positive or negative?
-      let sign = (this.parallax.currentOffsetY < destinationValueY) ? 1 : -1;
-      this.parallax.speedOffsetY *= sign;
-      // Move currentValue towards destinationValue
-      this.parallax.currentOffsetY += this.parallax.speedOffsetY;
-    }
-
-    // Translate canvas
-    // First reset to get fresh transform
+    // Translate canvas to it's new position that depends on the mouseCoords
+    // Move in the opposite direction of the mouse by a factor of parallax.coefficient
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    // NOTICE the minus so we move in opposite direction of mouse
     ctx.translate(
       Math.floor(-this.parallax.currentOffsetX * this.parallax.coefficient),
       Math.floor(-this.parallax.currentOffsetY * this.parallax.coefficient),
     );
-    // Apply changes to mouseCoords so their on the right basis
-    // Do not directly modify mouseCoords instance
+
+    // Apply changes to mouseCoords so they match new canvas origin
+    // ! Do not directly modify mouseCoords instance
     let translatedMouseCoords = {
       x: this.mouseCoords.x + Math.floor(this.parallax.currentOffsetX * this.parallax.coefficient),
       y: this.mouseCoords.y + Math.floor(this.parallax.currentOffsetY * this.parallax.coefficient),
     };
 
-
-
-    // Order canvas elements bassed on the distance of their centers from mouseCoords
-    // Elements w/ centers closest to mouse Coords get placed at end of array
+    // Order canvas elements bassed on the distance of their centers from the translated mouseCoords
+    // Elements w/ centers closest to translated mouse Coords get placed at end of array
     this.canvasElements.sort((elem1, elem2) =>
       euclideanDistance(elem2.center, translatedMouseCoords) - euclideanDistance(elem1.center, translatedMouseCoords)
     )
 
     // Draw new images by mapping over canvas elements
-    // Due to sorting, elements closest to mouse coords get painted over elements
-    // that are furter away.
+    // Due to sorting, elements closest to the translated mouse coords get
+    // painted over elements that are furter away.
     this.canvasElements.map(elem =>
       elem.draw(ctx, translatedMouseCoords)
     );
@@ -315,35 +278,40 @@ export default class Canvas extends React.Component {
   }
 
   /**
-   * MouseMove Event Handler - Retrieve mouse coordinates
+   * MouseMove Event Handler - Retrieve mouse coordinates and movement
+   *
+   * For the mouse movement, evt.movementX & evt.movementY are not used sinse
+   * they seem to behave randomly for sudden mouse movements.
    *
    * @param {object} evt - Event object
    */
   handleMouseMove = evt => {
     let canvasBox = this.canvas.getBoundingClientRect();
 
-    // NOT USING MOVEMENT X SINSE IT BUGS OUT ON SUDDEN JERKING MOVEMENTS
-    // TEST THIS WITH CONSOLE LOGS
+    // Current mouse coords
+    let mx = evt.clientX - canvasBox.left;
+    let my = evt.clientY - canvasBox.top;
+
+    // First time mouse moved
     if (this.prevMouseCoords.x === undefined & this.prevMouseCoords.y === undefined) {
-      // First time mouse moved
-      this.prevMouseCoords.x = evt.clientX - canvasBox.left;
-      this.prevMouseCoords.y = evt.clientY - canvasBox.top;
+      this.prevMouseCoords.x = mx;
+      this.prevMouseCoords.y = my;
     }
 
+    // Store coordinates and update total movement
     this.mouseCoords = {
-      x: evt.clientX - canvasBox.left,
-      y: evt.clientY - canvasBox.top,
-      totalMovementX: this.mouseCoords.totalMovementX + evt.clientX - canvasBox.left - this.prevMouseCoords.x,
-      totalMovementY: this.mouseCoords.totalMovementY + evt.clientY - canvasBox.top - this.prevMouseCoords.y,
+      x: mx,
+      y: my,
+      totalMovementX: this.mouseCoords.totalMovementX + (mx - this.prevMouseCoords.x),
+      totalMovementY: this.mouseCoords.totalMovementY + (my - this.prevMouseCoords.y),
     };
+
+    // Movement has been calculated so update previous mouse coords
     this.prevMouseCoords = {
-      x: this.mouseCoords.x,
-      y: this.mouseCoords.y,
+      x: mx,
+      y: my,
     }
-    //
-    //console.log(this.mouseCoords)
-    //console.log(this.prevMouseCoords)
-    // console.log('\n');
+
 
   }
 
@@ -359,12 +327,16 @@ export default class Canvas extends React.Component {
    */
   handleCanvasClick = (evt) => {
 
-    // Loop over all canvas elements and retrieve their regions
-    // If the mouse coords are withing image's region, it's been clicked
+    // Apply changes to mouseCoords so they match translated canvas origin
+    // See animate() function
+    let translatedMouseCoords = {
+      x: this.mouseCoords.x + Math.floor(this.parallax.currentOffsetX * this.parallax.coefficient),
+      y: this.mouseCoords.y + Math.floor(this.parallax.currentOffsetY * this.parallax.coefficient),
+    };
+
     let clickedElements = this.canvasElements.filter(elem => {
       // When calculating the regions, also consider their dynamic dimensions.
-      // Each images dimension is altered in their draw() method
-      // Therefore, compute the region using these altered dimensions (see draw())
+      // Each images dimension is altered in their draw() method. See draw()
       let cutOffDistance = 600;
       let mFactor = 0;
       if (elem.currentValue < cutOffDistance) {
@@ -374,16 +346,15 @@ export default class Canvas extends React.Component {
       let dynamicHeight = Math.floor(elem.height + elem.height * mFactor);
 
       // Is the mouse within the image's region?
-      return this.mouseCoords.x > elem.center.x - dynamicWidth / 2 &&
-             this.mouseCoords.x < elem.center.x + dynamicWidth / 2 &&
-             this.mouseCoords.y > elem.center.y - dynamicHeight / 2 &&
-             this.mouseCoords.y < elem.center.y + dynamicHeight /2
+      return translatedMouseCoords.x > elem.center.x - dynamicWidth / 2 &&
+             translatedMouseCoords.x < elem.center.x + dynamicWidth / 2 &&
+             translatedMouseCoords.y > elem.center.y - dynamicHeight / 2 &&
+             translatedMouseCoords.y < elem.center.y + dynamicHeight /2
     });
 
     // The clickedElements array may contain multiple entries as images may overlap in the canvas.
     // However the this.canvasElements array that was filtered to obtain the clickedElements
-    // has element already ordered from farther to closest to the mouseCoords (see this.animate())
-    // Select the last element
+    // has element already ordered - see this.animate(). Select last element.
     clickedElements.length > 0 && clickedElements[clickedElements.length - 1].onClick();
 
   }
