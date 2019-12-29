@@ -22,21 +22,23 @@ const CANVAS_IMAGE_PROPS = [
 ]
 
 /**
- * Class for images drawn on screen
- * Each instance holds all positional data & methods necessary to draw an image
- * on the canvas using the drawImage() method from the canvas API
- * See https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Using_images
+ * @class representing images drawn on screen
+ *  Each instance holds all positional data & methods necessary to draw and
+ *  animate an image on an HTML5 canvas using the drawImage() method from the canvas API
+ *  See https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Using_images
  */
 class CanvasImage {
 
   /**
-   * @param {number} left - left corner in px of the image to be painted within the canvas
-                            expressed relative to the canvas origin
-   * @param {number} top -  top corner in px of the image to be painted within the canvas,
-   *                        expressed relative to the canvas dimensions
-   * @param {number} width - Width in px of the image to be painted within the canvas
-   * @param {number} height - Height in px of the imge to be painted within the canvas
-   * @param {string} url - string URL, image source
+   * Represents an image and all positional data needed for painting on an HTML5 canvas
+   * Also initializes data used for easing image animations
+   * @constructor
+   *
+   * @param {number} left - Image's left corner (in px) relative to the canvas origin
+   * @param {number} top -  Image's top corner (in px) relative to the canvas origin
+   * @param {number} width - Width (in px) the image will occupy in the canvas
+   * @param {number} height - Height (in px) the imge will occupy in the canvas
+   * @param {string} url - Source of the image
    */
   constructor(left, top, width, height, url) {
     this.width = width;
@@ -46,19 +48,17 @@ class CanvasImage {
       x: left + width / 2,
       y: top + height / 2,
     }
-    // Used for easing animations in this.draw() method
+    /* Used for easing animations in the draw() method */
     this.currentValue = 2000;
     this.speed = 0;
   }
 
   /**
-   * Responsible for the initial drawing of the image on the canvas.
+   * Loads & draws an image on the canvas without animations
    *
-   * @param {object} ctx - A CanvasRenderingContext2D object, providing the draw functions
-   *                       See CANVAS API: https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Basic_usage
+   * @param {object} ctx - Canvas rendering context object
    */
   drawInit(ctx) {
-    // Create new image element and draw it on the canvas when it loads
     this.img = new Image();
     this.img.addEventListener('load', () => {
       ctx.drawImage(this.img,
@@ -71,24 +71,25 @@ class CanvasImage {
   }
 
   /**
-   * Responsible for drawing an new image on the canvas.
+   * Redraws an image on the canvas while animating the image's dimensions.
    * The dimensions of the drawn image depend linerly on the distance between
-   * the image's center and the currect mouse position.
+   * the image's center and the mouse position. The closer the mouse gets to
+   * the image's center, the more the image's dimensions grow (up to 2x size)
    *
    * This function is called within an animation loop. At each time step,
    * the image's dimensions slowly animate towards their final value using an easing function.
    * Try moving the mouse. You'll notice the animation lingers even after the mouse
    * stops moving, offering a smoother experience.
    *
-   * @param {object} ctx - Canvas rendering context, providing the draw functions
-   * @param {object} mouseCoords - Current position of the mouse on the 2D canvas
-   *                               Object containing x and y coords.
+   * @param {object} ctx - Canvas rendering context object
+   * @param {object} mouseCoords - Object containing x and y coords of the mouse
+   *                               relative to the canvas origin
    */
   draw(ctx, mouseCoords) {
 
-    // Value we want to reach as we animate
+    // Value we want to reach as we animate - Expresses distance
     let dest = euclideanDistance(this.center, mouseCoords);
-    // Value at current time step
+    // Value at current time step - Expresses distance
     let curr = this.currentValue;
     // Current rate of change
     let speed = this.speed;
@@ -99,26 +100,19 @@ class CanvasImage {
     // Apply easing
     [this.currentValue, this.speed] = getEasing(dest, curr, speed, acc_coef, compareFunction);
 
-    // Transform currentValue (expressing distance) into a number in [0,1]
+    // Linearly interpolate currentValue from [cutOffDistance, 0] to [0,1]
+    // where cutOffDistance = 600px (for performance reasons)
+    // Linear f(distance) = (-1 / cutOffDistance) * distance + 1
     let cutOffDistance = 600;
-    let mFactor = 0;
-    if (this.currentValue < cutOffDistance) {
-      // Linear f(distance) = (-1 / cutOffDistance) * distance + 1
-      //    - As distance aproaches cutOffDistance => f(distance) approaches 0
-      //    - As distance aproaches 0               => f(distance) approaches 1
-      mFactor = (-1 / cutOffDistance) * this.currentValue + 1;
-    }
+    let mFactor = (-1 / cutOffDistance) * this.currentValue + 1;
+    if (this.currentValue > cutOffDistance) { mFactor = 0;}
 
     // Compute new width of images based on above linear transformation
-    let dynamicWidth = Math.floor(this.width + this.width * mFactor);
-    let dynamicHeight = Math.floor(this.height + this.height * mFactor);
-
+    let width = Math.floor(this.width + this.width * mFactor);
+    let height = Math.floor(this.height + this.height * mFactor);
 
     // Draw a new image on the canvas w/ the new dimensions
-    ctx.drawImage(this.img,
-      (this.center.x - dynamicWidth/2),
-      (this.center.y - dynamicHeight/2),
-      dynamicWidth, dynamicHeight);
+    ctx.drawImage(this.img, this.center.x - width/2, this.center.y - height/2, width, height);
   }
 
   /**
@@ -131,35 +125,54 @@ class CanvasImage {
 }
 
 /**
- *
+ * @class component that renders an HTML5 canvas covering the entire screen
+ * @extends React.Component
  */
 export default class Canvas extends React.Component {
 
 
-  // Array of elements drawn on canvas
+  /**
+   * @instance {array} - Contains all elements currently drawn on the canvas
+   */
   canvasElements = [];
 
-  // Most recently recorded mouse coordinates
+  /**
+   * @typedef {object} mouseCoords
+   * @instance {object} - Contains the most recent mouse position as well as
+   *                      the total relative distance the mouse has traveled
+   *                      in the X and Y axises
+   */
    mouseCoords = {
      x: 2000,
      y: 2000,
-     // Total mouse movement
      totalMovementX: 0,
      totalMovementY: 0,
    }
-   // Prev value of mouse coordinates
+
+   /**
+    * @instance {object} - Contains the previous position of the mouse
+    *                      before the last update to {@link mouseCoords}
+    */
    prevMouseCoords = {
      x: undefined,
      y: undefined,
    }
 
-   // Object containing properties used for paralax animation
-   // Rename to left and top
-   parallax = {
-     currentOffsetX: 0,
-     speedOffsetX: 0,
-     currentOffsetY: 0,
-     speedOffsetY: 0,
+   /**
+    * @instance {object} - Contains data used for easing canvas origin animations
+    *                      in {@link Canvas#animate}
+    *
+    * @param {number} currentLeft - Most up-to-date value of the left-most point of the canvas
+    * @param {number} speedLeft - Rate of change of the left-most point of the canvas
+    * @param {number} currentTop - Most up-to-date value of the top-most point of the canvas
+    * @param {number} speedTop - Rate of change of the left-most point of the canvas
+    * @param {number} coefficient - Controls impact of animation in {@link Canvas#animate}
+    */
+   origin = {
+     currentLeft: 0,
+     speedLeft: 0,
+     currentTop: 0,
+     speedTop: 0,
      coefficient: 1/4,
    }
 
@@ -169,95 +182,74 @@ export default class Canvas extends React.Component {
    *
    * @param {object} element - HTML DOM element the ref callback is attached to
    */
-  setCanvasRef = (element) => {
+  setCanvasRef = (element) =>
     this.canvas = element
-  }
 
   /**
-   * Sets-up images in canvas (initial draw) and starts animation loop
+   * Clears the canvas completelly
+   *
+   * @param {object} ctx - Canvas rendering context object
    */
-  componentDidMount() {
-    let ctx = this.canvas.getContext('2d', { alpha: false });
-
-    // Create & Draw Canvas Images
-    CANVAS_IMAGE_PROPS.map((img, idx) => {
-        this.canvasElements[idx] = new CanvasImage(
-          img.left * this.canvas.width - img.w / 2,
-          img.top * this.canvas.height - img.h / 2,
-          img.w, img.h, img.url);
-
-        return this.canvasElements[idx].drawInit(ctx);
-    });
-
-    // Start animation
-    this.animate();
-
-  }
-
-  //
-  // DONT FORGET TO KILL ANIMATION!!!!
-  //
-  componentWillUnmount() {
-    alert('You forgot to kill the animation');
-  }
+   clearCanvas = (ctx) => {
+     ctx.save();
+     ctx.globalCompositeOperation = 'copy';
+     ctx.strokeStyle = 'transparent';
+     ctx.beginPath();
+     ctx.lineTo(0, 0);
+     ctx.stroke();
+     ctx.restore();
+   }
 
   /**
    * Clears the canvas and applies a paralax effect by animating the canvas's origin,
    * based on the current mouse coordinates.
    * It then re-draws images, animating their dimensions based on the distance of
-   * their centers to the mouse position - see draw() method
+   * their centers to the mouse position - see {@link CanvasImage#draw} method
    *
-   * This function is called within an animation loop. At each time step,
-   * the canva's origin animates towards its final value using an easing function.
-   * Try moving the mouse. You'll notice the animation lingers even after the mouse
-   * stops moving, offering a smoother experience.
+   * At each time step, the canva's origin animates towards its final value using
+   * an easing function. Try moving the mouse and you'll notice the animation
+   * lingers even after the mouse stops moving, offering a smoother experience.
    */
   animate() {
     let ctx = this.canvas.getContext('2d');
 
     // Clear canvas
-    ctx.save();
-    ctx.globalCompositeOperation = 'copy';
-    ctx.strokeStyle = 'transparent';
-    ctx.beginPath();
-    ctx.lineTo(0, 0);
-    ctx.stroke();
-    ctx.restore();
+    this.clearCanvas(ctx);
 
     // Destination values for canva's origin in the x and y plane resp.
     let destLeft = this.mouseCoords.totalMovementX;
     let destTop = this.mouseCoords.totalMovementY;
     // Values at current time step
-    let currLeft = this.parallax.currentOffsetX;
-    let currTop = this.parallax.currentOffsetY;
+    let currLeft = this.origin.currentLeft;
+    let currTop = this.origin.currentTop;
     // Rate of change at current time step
-    let speedLeft = this.parallax.speedOffsetX;
-    let speedTop = this.parallax.speedOffsetY;
+    let speedLeft = this.origin.speedLeft;
+    let speedTop = this.origin.speedTop;
     // Accelaration coefficient
     let acc_coef = 0.05;
     // Function used to compare how close the currect value is to the destination value
     let compareFunction = (a,b) => Math.abs(a - b);
 
     // Apply easing and store results for next loop
-    [this.parallax.currentOffsetX, this.parallax.speedOffsetX] =
+    [this.origin.currentLeft, this.origin.speedLeft] =
       getEasing(destLeft, currLeft, speedLeft, acc_coef, compareFunction);
-    [this.parallax.currentOffsetY, this.parallax.speedOffsetY] =
+    [this.origin.currentTop, this.origin.speedTop] =
       getEasing(destTop, currTop, speedTop, acc_coef, compareFunction);
 
 
-    // Translate canvas to it's new position that depends on the mouseCoords
-    // Move in the opposite direction of the mouse by a factor of parallax.coefficient
+    // Translate canvas to it's new position
+    // Move in the opposite direction of the mouse by a factor of origin.coefficient
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.translate(
-      Math.floor(-this.parallax.currentOffsetX * this.parallax.coefficient),
-      Math.floor(-this.parallax.currentOffsetY * this.parallax.coefficient),
+      Math.floor(-this.origin.currentLeft * this.origin.coefficient),
+      Math.floor(-this.origin.currentTop * this.origin.coefficient),
     );
 
-    // Apply changes to mouseCoords so they match new canvas origin
+    // Apply changes to mouseCoords so they match the new translated canvas origin
     // ! Do not directly modify mouseCoords instance
     let translatedMouseCoords = {
-      x: this.mouseCoords.x + Math.floor(this.parallax.currentOffsetX * this.parallax.coefficient),
-      y: this.mouseCoords.y + Math.floor(this.parallax.currentOffsetY * this.parallax.coefficient),
+      x: this.mouseCoords.x + Math.floor(this.origin.currentLeft * this.origin.coefficient),
+      y: this.mouseCoords.y + Math.floor(this.origin.currentTop * this.origin.coefficient),
     };
 
     // Order canvas elements bassed on the distance of their centers from the translated mouseCoords
@@ -266,9 +258,9 @@ export default class Canvas extends React.Component {
       euclideanDistance(elem2.center, translatedMouseCoords) - euclideanDistance(elem1.center, translatedMouseCoords)
     )
 
-    // Draw new images by mapping over canvas elements
-    // Due to sorting, elements closest to the translated mouse coords get
-    // painted over elements that are furter away.
+    // Draw new images by mapping over the sorted canvas elements
+    // Elements closest to the translated mouse coords get painted over elements
+    // that are furter away.
     this.canvasElements.map(elem =>
       elem.draw(ctx, translatedMouseCoords)
     );
@@ -279,8 +271,7 @@ export default class Canvas extends React.Component {
 
   /**
    * MouseMove Event Handler - Retrieve mouse coordinates and movement
-   *
-   * For the mouse movement, evt.movementX & evt.movementY are not used sinse
+   * Note: For the mouse movement, evt.movementX & evt.movementY are not used sinse
    * they seem to behave randomly for sudden mouse movements.
    *
    * @param {object} evt - Event object
@@ -311,14 +302,12 @@ export default class Canvas extends React.Component {
       x: mx,
       y: my,
     }
-
-
   }
 
   /**
    * Click Event Handler (on canvas)
    *
-   * Elements drawn on canvas don't fire click events.
+   * Elements drawn on canvas don't fire click events (they're just pixels!).
    * Therefore, a click is registered on the canvas and the region clicked
    * is checked against the regions of all drawn elements.
    * The closest matched element fires its onClick() method
@@ -330,35 +319,57 @@ export default class Canvas extends React.Component {
     // Apply changes to mouseCoords so they match translated canvas origin
     // See animate() function
     let translatedMouseCoords = {
-      x: this.mouseCoords.x + Math.floor(this.parallax.currentOffsetX * this.parallax.coefficient),
-      y: this.mouseCoords.y + Math.floor(this.parallax.currentOffsetY * this.parallax.coefficient),
+      x: this.mouseCoords.x + Math.floor(this.origin.currentLeft * this.origin.coefficient),
+      y: this.mouseCoords.y + Math.floor(this.origin.currentTop * this.origin.coefficient),
     };
 
     let clickedElements = this.canvasElements.filter(elem => {
       // When calculating the regions, also consider their dynamic dimensions.
       // Each images dimension is altered in their draw() method. See draw()
       let cutOffDistance = 600;
-      let mFactor = 0;
-      if (elem.currentValue < cutOffDistance) {
-        mFactor = ((-1 / cutOffDistance) * elem.currentValue + 1);
-      }
-      let dynamicWidth = Math.floor(elem.width + elem.width * mFactor);
-      let dynamicHeight = Math.floor(elem.height + elem.height * mFactor);
+      let mFactor = (-1 / cutOffDistance) * elem.currentValue + 1;
+      if (elem.currentValue > cutOffDistance) { mFactor = 0;}
+      let width = Math.floor(elem.width + elem.width * mFactor);
+      let height = Math.floor(elem.height + elem.height * mFactor);
 
       // Is the mouse within the image's region?
-      return translatedMouseCoords.x > elem.center.x - dynamicWidth / 2 &&
-             translatedMouseCoords.x < elem.center.x + dynamicWidth / 2 &&
-             translatedMouseCoords.y > elem.center.y - dynamicHeight / 2 &&
-             translatedMouseCoords.y < elem.center.y + dynamicHeight /2
+      return translatedMouseCoords.x > elem.center.x - width / 2 &&
+             translatedMouseCoords.x < elem.center.x + width / 2 &&
+             translatedMouseCoords.y > elem.center.y - height / 2 &&
+             translatedMouseCoords.y < elem.center.y + height /2
     });
 
     // The clickedElements array may contain multiple entries as images may overlap in the canvas.
     // However the this.canvasElements array that was filtered to obtain the clickedElements
     // has element already ordered - see this.animate(). Select last element.
     clickedElements.length > 0 && clickedElements[clickedElements.length - 1].onClick();
-
   }
 
+  /**
+   * Perfoms the initial draw on the canvas using {@link CanvasImage#drawInit}
+   * and starts the animation loop {@link animate()}
+   */
+  componentDidMount() {
+    let ctx = this.canvas.getContext('2d', { alpha: false });
+
+    CANVAS_IMAGE_PROPS.forEach((img, idx) => {
+        this.canvasElements[idx] = new CanvasImage(
+          img.left * this.canvas.width - img.w / 2,
+          img.top * this.canvas.height - img.h / 2,
+          img.w, img.h, img.url);
+
+        this.canvasElements[idx].drawInit(ctx);
+    });
+
+    this.animate();
+  }
+
+  //
+  // DONT FORGET TO KILL ANIMATION!!!!
+  //
+  componentWillUnmount() {
+    alert('You forgot to kill the animation');
+  }
 
   render() {
     return (
