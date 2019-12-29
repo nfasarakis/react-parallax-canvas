@@ -48,7 +48,13 @@ class CanvasImage {
       x: left + width / 2,
       y: top + height / 2,
     }
+    /** Boolean denoting whether on not image has finished loading */
     this.hasLoaded = false;
+    /** Opacity of image, animated in {@link CanvasImage#drawFadeIn} */
+    this.opacity = 0;
+    /** Timestamp equal to the time the image started it's fadein animation
+        in {@link CanvasImage#drawFadeIn}*/
+    this.loadingAnimationStartTime = null;
     /** Used for easing animations in the {@link CanvasImage#draw} method */
     this.currentValue = 2000;
     this.speed = 0;
@@ -63,22 +69,47 @@ class CanvasImage {
       // Mark image as loaded
       // Added a delay to simulate network conditions
       setTimeout(() => {
-          this.hasLoaded = true;
-      }, 2000 * Math.random())
+          this.hasLoaded = true;//
+      }, 1000 * Math.random())
 
     }, false);
     this.img.src = this.url;
   }
 
   /**
+   * Description here
    *
+   * @param {object} ctx - Canvas rendering context object
+   * @param {number} duration - Total animation duration (in ms)
+   * @param {number} timestamp - current point in time (in ms) when requestAnimationFrame()
+   *                             starts to execute callback functions.
    */
-  drawFadeIn(ctx) {
+  drawFadeIn(ctx, duration, timestamp) {
+    // Set animation start time
+    if (!this.loadingAnimationStartTime) {
+      this.loadingAnimationStartTime = timestamp;
+    }
+    // Calculate animation progress
+    let currentTime = timestamp - this.loadingAnimationStartTime;
+    if (currentTime <= duration) {
+      // Normalise currentTime/progress in the [0,1] range
+      let normalizedTime = currentTime / duration;
+      // Apply easeInQuad easing to normalized time
+      normalizedTime = normalizedTime * normalizedTime;
+      // Update animated opacity
+      this.opacity = normalizedTime;
+    } else {
+      this.opacity = 1;
+    }
+
+    // Draw image w/ opacity by manipulating globalAlpha, then reset
+    ctx.globalAlpha = this.opacity;
     ctx.drawImage(this.img,
         Math.floor(this.center.x - this.width / 2),
         Math.floor(this.center.y - this.height / 2),
         Math.floor(this.width),
         Math.floor(this.height));
+    ctx.globalAlpha = 1;
   }
 
   /**
@@ -230,17 +261,20 @@ export default class Canvas extends React.Component {
     *    via {@link Canvas#drawingAnimation}
     * The selection above depends on the value of the instance variable
     * {@link Canvas#hasInitAnimationFinished}
+    *
+    * @param {number} timestamp - current point in time (in ms) when requestAnimationFrame()
+    *                             starts to execute callback functions.
     */
-   animate() {
+   animate(timestamp) {
 
      if (!this.hasInitAnimationFinished) {
-       this.loadingAnimation();
+       this.loadingAnimation(timestamp);
      } else {
        this.drawingAnimation();
      }
 
-     // Loop animation and store its id
-     this.animationID = requestAnimationFrame(()=>this.animate());
+     // Loop animation and store its id//
+     this.animationID = requestAnimationFrame((timestamp)=>this.animate(timestamp));
    }
 
    /**
@@ -251,27 +285,28 @@ export default class Canvas extends React.Component {
     *
     * At each step the each LOADED image's opacity animates from 0 to 1 w/ easeOut easing
     * function
+    *
+    * @param {number} timestamp - current point in time (in ms) when requestAnimationFrame()
+    *                             starts to execute callback functions.
     */
-   loadingAnimation() {
+   loadingAnimation(timestamp) {
      let ctx = this.canvas.getContext('2d', { alpha: false });
-
      // Clear canvas
      this.clearCanvas(ctx);
-
      // Draw new images w/ animating opacity
-     this.canvasElements.forEach(elem =>
-       elem.hasLoaded && elem.drawFadeIn(ctx)
-     );
+     this.canvasElements.forEach(elem => {
+       let duration = 2000;
+       elem.hasLoaded && elem.drawFadeIn(ctx, duration, timestamp)
+     });
 
      // initalAnimation has finished only if all images have loaded and all
      // their opacities are 1
-     let numLoadedImages = 0;
-     this.canvasElements.forEach((elem, idx) =>
-       numLoadedImages += (elem.hasLoaded === true) ? 1 : 0
-     );
-     let haveAllImagesLoaded = (numLoadedImages === CANVAS_IMAGE_PROPS.length)
-     this.hasInitAnimationFinished = haveAllImagesLoaded;
-
+     let numVisibleLoadedImages = 0;
+     this.canvasElements.forEach((elem, idx) => {
+       numVisibleLoadedImages += (elem.hasLoaded === true && elem.opacity === 1) ? 1 : 0;
+     });
+     let haveAllImagesBeenShown = (numVisibleLoadedImages === CANVAS_IMAGE_PROPS.length)
+     this.hasInitAnimationFinished = haveAllImagesBeenShown;
    }
 
   /**
@@ -423,15 +458,24 @@ export default class Canvas extends React.Component {
    */
   componentDidMount() {
 
+    // Create image instances
     CANVAS_IMAGE_PROPS.forEach((img, idx) => {
         this.canvasElements[idx] = new CanvasImage(
           img.left * this.canvas.width - img.w / 2,
           img.top * this.canvas.height - img.h / 2,
           img.w, img.h, img.url);
-
-        // Load the image
-        this.canvasElements[idx].loadImage();
     });
+
+    /** Order images bassed on the distance of their centers from the initial mouseCoords
+        Elements w/ centers closest to translated mouse Coords get placed at end of array
+        and are painted last - this is done to be consistent with
+        {@link Canvas#drawingAnimation} */
+    this.canvasElements.sort((elem1, elem2) =>
+      euclideanDistance(elem2.center, this.mouseCoords) - euclideanDistance(elem1.center, this.mouseCoords)
+    )
+
+    // Load images
+    this.canvasElements.forEach(elem => elem.loadImage());
 
     this.animate();
   }
