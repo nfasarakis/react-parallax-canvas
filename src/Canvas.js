@@ -48,7 +48,7 @@ class CanvasImage {
       x: left + width / 2,
       y: top + height / 2,
     }
-    /* Used for easing animations in the draw() method */
+    /** Used for easing animations in the {@link CanvasImage#draw} method */
     this.currentValue = 2000;
     this.speed = 0;
   }
@@ -160,13 +160,13 @@ export default class Canvas extends React.Component {
 
    /**
     * @instance {object} - Contains data used for easing canvas origin animations
-    *                      in {@link Canvas#animate}
+    *                      in {@link Canvas#drawingAnimation}
     *
     * @param {number} currentLeft - Most up-to-date value of the left-most point of the canvas
     * @param {number} speedLeft - Rate of change of the left-most point of the canvas
     * @param {number} currentTop - Most up-to-date value of the top-most point of the canvas
     * @param {number} speedTop - Rate of change of the left-most point of the canvas
-    * @param {number} coefficient - Controls impact of animation in {@link Canvas#animate}
+    * @param {number} coefficient - Controls impact of animation in {@link Canvas#drawingAnimation}
     */
    origin = {
      currentLeft: 0,
@@ -181,6 +181,12 @@ export default class Canvas extends React.Component {
     *                      via requestAnimationFrame. Used for cleanup
     */
    animationID = undefined;
+
+   /**
+    * @instance {boolean} - Boolean detoting if the initial animation that first
+    *                      draws images has completed. Used in {@link Canvas#animate}
+    */
+  hasInitAnimationFinished = false;
 
   /**
    * Retrieves ref to canvas DOM element via ref callback attached in render()
@@ -206,9 +212,41 @@ export default class Canvas extends React.Component {
      ctx.restore();
    }
 
+   /**
+    * Animates canvas in an animation loop to either
+    * A) initially load the images via {@link Canvas#loadingAnimation} or
+    * B) animate the images and canvas loading based on the mouse position
+    *    via {@link Canvas#drawingAnimation}
+    * The selection above depends on the value of the instance variable
+    * {@link Canvas#hasInitAnimationFinished}
+    */
+   animate() {
+
+     if (!this.hasInitAnimationFinished) {
+       this.loadingAnimation();
+     } else {
+       this.drawingAnimation();
+     }
+
+     // Loop animation and store its id
+     this.animationID = requestAnimationFrame(()=>this.animate());
+   }
+
+   /**
+    * Animation loop for when images first load and get drawn to the canvas for
+    * the first time.
+    *
+    * At each step the each image's opacity animates from 0 to 1 w/ eachOut easing
+    * function
+    */
+   loadingAnimation() {
+
+     this.hasInitAnimationFinished = true;
+   }
+
   /**
-   * Clears the canvas and applies a paralax effect by animating the canvas's origin,
-   * based on the current mouse coordinates.
+   * Applies a paralax effect by animating the canvas's origin, based on the
+   * current mouse coordinates.
    * It then re-draws images, animating their dimensions based on the distance of
    * their centers to the mouse position - see {@link CanvasImage#draw} method
    *
@@ -217,7 +255,7 @@ export default class Canvas extends React.Component {
    * This easing is not-deterministic as the destinationValue depends on the mouse
    * movement that may change suddenly
    */
-  animate() {
+  drawingAnimation() {
     let ctx = this.canvas.getContext('2d');
 
     // Clear canvas
@@ -272,8 +310,6 @@ export default class Canvas extends React.Component {
       elem.draw(ctx, translatedMouseCoords)
     );
 
-    // Loop animation and store its id
-    this.animationID = requestAnimationFrame(()=>this.animate());
   }
 
   /**
@@ -323,8 +359,8 @@ export default class Canvas extends React.Component {
    */
   handleCanvasClick = (evt) => {
 
-    // Apply changes to mouseCoords so they match translated canvas origin
-    // See animate() function
+    /** Apply changes to mouseCoords so they match translated canvas origin
+        See {@link Canvas#drawingAnimation} function*/
     let translatedMouseCoords = {
       x: this.mouseCoords.x + Math.floor(this.origin.currentLeft * this.origin.coefficient),
       y: this.mouseCoords.y + Math.floor(this.origin.currentTop * this.origin.coefficient),
@@ -346,15 +382,15 @@ export default class Canvas extends React.Component {
              translatedMouseCoords.y < elem.center.y + height /2
     });
 
-    // The clickedElements array may contain multiple entries as images may overlap in the canvas.
-    // However the this.canvasElements array that was filtered to obtain the clickedElements
-    // has element already ordered - see this.animate(). Select last element.
+    /** The clickedElements array may contain multiple entries as images may overlap in the canvas.
+        However the this.canvasElements array that was filtered to obtain the clickedElements
+        has element already ordered in {@link Canvas#drawingAnimation}. Select last element. */
     clickedElements.length > 0 && clickedElements[clickedElements.length - 1].onClick();
   }
 
   /**
    * Perfoms the initial draw on the canvas using {@link CanvasImage#drawInit}
-   * and starts the animation loop {@link animate()}
+   * and starts the animation loop in {@link animate()}
    */
   componentDidMount() {
     let ctx = this.canvas.getContext('2d', { alpha: false });
