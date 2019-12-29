@@ -176,6 +176,12 @@ export default class Canvas extends React.Component {
      coefficient: 1/4,
    }
 
+   /**
+    * @instance {number} - The ID of the last requested animation frame retrieved
+    *                      via requestAnimationFrame. Used for cleanup
+    */
+   animationID = undefined;
+
   /**
    * Retrieves ref to canvas DOM element via ref callback attached in render()
    * This ref is guaranteed to be up-to-date before lifecycle methods fire.
@@ -265,8 +271,8 @@ export default class Canvas extends React.Component {
       elem.draw(ctx, translatedMouseCoords)
     );
 
-    // Loop animation
-    requestAnimationFrame(()=>this.animate());
+    // Loop animation and store its id
+    this.animationID = requestAnimationFrame(()=>this.animate());
   }
 
   /**
@@ -364,11 +370,11 @@ export default class Canvas extends React.Component {
     this.animate();
   }
 
-  //
-  // DONT FORGET TO KILL ANIMATION!!!!
-  //
+  /**
+   * Cancels the animation loo performed in {@link animate()}
+   */
   componentWillUnmount() {
-    alert('You forgot to kill the animation');
+    cancelAnimationFrame(this.animationID);
   }
 
   render() {
