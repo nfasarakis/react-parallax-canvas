@@ -48,26 +48,37 @@ class CanvasImage {
       x: left + width / 2,
       y: top + height / 2,
     }
+    this.hasLoaded = false;
     /** Used for easing animations in the {@link CanvasImage#draw} method */
     this.currentValue = 2000;
     this.speed = 0;
   }
 
   /**
-   * Loads & draws an image on the canvas without animations
-   *
-   * @param {object} ctx - Canvas rendering context object
+   * Loads an image for use on the canvas
    */
-  drawInit(ctx) {
+  loadImage() {
     this.img = new Image();
     this.img.addEventListener('load', () => {
-      ctx.drawImage(this.img,
-          Math.floor(this.center.x - this.width / 2),
-          Math.floor(this.center.y - this.height / 2),
-          Math.floor(this.width),
-          Math.floor(this.height));
+      // Mark image as loaded
+      // Added a delay to simulate network conditions
+      setTimeout(() => {
+          this.hasLoaded = true;
+      }, 2000 * Math.random())
+
     }, false);
     this.img.src = this.url;
+  }
+
+  /**
+   *
+   */
+  drawFadeIn(ctx) {
+    ctx.drawImage(this.img,
+        Math.floor(this.center.x - this.width / 2),
+        Math.floor(this.center.y - this.height / 2),
+        Math.floor(this.width),
+        Math.floor(this.height));
   }
 
   /**
@@ -186,7 +197,7 @@ export default class Canvas extends React.Component {
     * @instance {boolean} - Boolean detoting if the initial animation that first
     *                      draws images has completed. Used in {@link Canvas#animate}
     */
-  hasInitAnimationFinished = false;
+   hasInitAnimationFinished = false;
 
   /**
    * Retrieves ref to canvas DOM element via ref callback attached in render()
@@ -235,13 +246,32 @@ export default class Canvas extends React.Component {
    /**
     * Animation loop for when images first load and get drawn to the canvas for
     * the first time.
+    * Checks if image has actually loaded before starting the animation specified
+    * in {@link CanvasImage#drawFadeIn}
     *
-    * At each step the each image's opacity animates from 0 to 1 w/ eachOut easing
+    * At each step the each LOADED image's opacity animates from 0 to 1 w/ easeOut easing
     * function
     */
    loadingAnimation() {
+     let ctx = this.canvas.getContext('2d', { alpha: false });
 
-     this.hasInitAnimationFinished = true;
+     // Clear canvas
+     this.clearCanvas(ctx);
+
+     // Draw new images w/ animating opacity
+     this.canvasElements.forEach(elem =>
+       elem.hasLoaded && elem.drawFadeIn(ctx)
+     );
+
+     // initalAnimation has finished only if all images have loaded and all
+     // their opacities are 1
+     let numLoadedImages = 0;
+     this.canvasElements.forEach((elem, idx) =>
+       numLoadedImages += (elem.hasLoaded === true) ? 1 : 0
+     );
+     let haveAllImagesLoaded = (numLoadedImages === CANVAS_IMAGE_PROPS.length)
+     this.hasInitAnimationFinished = haveAllImagesLoaded;
+
    }
 
   /**
@@ -256,7 +286,7 @@ export default class Canvas extends React.Component {
    * movement that may change suddenly
    */
   drawingAnimation() {
-    let ctx = this.canvas.getContext('2d');
+    let ctx = this.canvas.getContext('2d', { alpha: false });
 
     // Clear canvas
     this.clearCanvas(ctx);
@@ -389,11 +419,9 @@ export default class Canvas extends React.Component {
   }
 
   /**
-   * Perfoms the initial draw on the canvas using {@link CanvasImage#drawInit}
-   * and starts the animation loop in {@link animate()}
+   * Loads the images and starts the animation loop in {@link animate()}
    */
   componentDidMount() {
-    let ctx = this.canvas.getContext('2d', { alpha: false });
 
     CANVAS_IMAGE_PROPS.forEach((img, idx) => {
         this.canvasElements[idx] = new CanvasImage(
@@ -401,7 +429,8 @@ export default class Canvas extends React.Component {
           img.top * this.canvas.height - img.h / 2,
           img.w, img.h, img.url);
 
-        this.canvasElements[idx].drawInit(ctx);
+        // Load the image
+        this.canvasElements[idx].loadImage();
     });
 
     this.animate();
