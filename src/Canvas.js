@@ -53,13 +53,13 @@ class CanvasImage {
     // Create new img element and draw it on the canvas when it loads
     this.img = new Image();
     this.img.addEventListener('load', () => {
-      ctx.drawImage(this.img, this.center.x - this.width / 2, this.center.y - this.height / 2, this.width, this.height);
+      ctx.drawImage(this.img,
+          Math.floor(this.center.x - this.width / 2),
+          Math.floor(this.center.y - this.height / 2),
+          Math.floor(this.width),
+          Math.floor(this.height));
     }, false);
     this.img.src = this.url;
-
-    // Draw a rectangle at the center of the image (for testing)
-    ctx.fillStyle = 'rgb(40, 0, 0)';
-    ctx.fillRect(this.center.x-3, this.center.y-3, 6, 6);
   }
 
   /**
@@ -80,26 +80,24 @@ class CanvasImage {
 
     // Parallax Effect: Move center of image in opposite direction of mouse movement
     if (prevMouseCoords.x !== 0 && prevMouseCoords.y !== 0) {
-      this.center.x = this.center.x + (mouseCoords.x - prevMouseCoords.x)/6;
-      this.center.y = this.center.y + (mouseCoords.y - prevMouseCoords.y)/8;
+      this.center.x = this.center.x + (mouseCoords.x - prevMouseCoords.x);
+      this.center.y = this.center.y + (mouseCoords.y - prevMouseCoords.y);
     }
 
     // The closer the mouse is to the image's center, the larger the image dimensions
     // This is achieved by computing a multiplication factor that
-    //    1) is 1 when the mouse coordinates become equal to the images center
+    //    1) is 2 when the mouse coordinates become equal to the images center
     //    2) decreases linearly as the distance between mouse and image center grows,
     //       reaching zero when the distance becomes larger than 300px (cuttOffDistance)
-    let mFactor = getMultiplicationFactor(300, this.center, mouseCoords)
-    let dynamicWidth = this.width + this.width * mFactor;
-    let dynamicHeight = this.height + this.height * mFactor;
+    let mFactor = getMultiplicationFactor(600, this.center, mouseCoords)
+    let dynamicWidth = Math.floor(this.width + this.width * mFactor);
+    let dynamicHeight = Math.floor(this.height + this.height * mFactor);
 
     // Draw a new image on the canvas around the new center w/ the new dimensions
-    ctx.drawImage(this.img, this.center.x - dynamicWidth/2, this.center.y - dynamicHeight/2, dynamicWidth, dynamicHeight);
-
-
-    // Draw rectangle center (for testing)
-    ctx.fillStyle = 'rgb(40, 0, 0)';
-    ctx.fillRect(this.center.x-3, this.center.y-3, 6, 6);
+    ctx.drawImage(this.img,
+      Math.floor(this.center.x - dynamicWidth/2),
+      Math.floor(this.center.y - dynamicHeight/2),
+      dynamicWidth, dynamicHeight);
   }
 
   /**
@@ -141,7 +139,7 @@ export default class Canvas extends React.Component {
    */
   componentDidMount() {
     // Draw function
-    let ctx = this.canvas.getContext('2d');
+    let ctx = this.canvas.getContext('2d', { alpha: false });
 
     // Create & Draw Canvas Images
     CANVAS_IMAGE_PROPS.map((img, idx) => {
@@ -173,7 +171,7 @@ export default class Canvas extends React.Component {
    *
    * Computes mouse position and uses it to re-draw images on canvas
    * Each images position and dimension depend on said mouse position
-   * in a way that creates a parallax and scalling effect as determined
+   * in a way that a scalling effect as determined
    * in each image instance draw() menthod.
    *
    * @param {object} evt - Event object
@@ -184,6 +182,7 @@ export default class Canvas extends React.Component {
     let mouseCoords = this.getMouseCoords(evt);
 
     requestAnimationFrame(() => {
+
       // Clear canvas
       ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
@@ -224,7 +223,7 @@ export default class Canvas extends React.Component {
     let clickedElements = this.canvasElements.filter(elem => {
       // When calculating the regions, also consider the mFactor.
       // The mFactor used in draw() alters the image's dimensios, hence it's region
-      let mFactor = getMultiplicationFactor(300, elem.center, mouseCoords);
+      let mFactor = getMultiplicationFactor(600, elem.center, mouseCoords);
       let dynamicWidth = elem.width + elem.width * mFactor;
       let dynamicHeight = elem.height + elem.height * mFactor;
 
